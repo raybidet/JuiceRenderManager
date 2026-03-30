@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
         self.queue_tree.setRootIsDecorated(False)
         self.queue_tree.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
         headers = [
-            "#", "Blend File", "Scene", "Blender", "Samples", "Sequence",
+            "#", "Blend File", "Scene", "Blender", "Samples", "Res %", "Sequence",
             "Frames", "Output", "Status", "%", "Frame",
         ]
         self.queue_tree.setHeaderLabels(headers)
@@ -446,12 +446,13 @@ class MainWindow(QMainWindow):
         self.queue_tree.setColumnWidth(2, 72)
         self.queue_tree.setColumnWidth(3, 100)
         self.queue_tree.setColumnWidth(4, 52)
-        self.queue_tree.setColumnWidth(5, 88)
-        self.queue_tree.setColumnWidth(6, 72)
-        self.queue_tree.setColumnWidth(7, 120)
-        self.queue_tree.setColumnWidth(8, 72)
-        self.queue_tree.setColumnWidth(9, 36)
-        self.queue_tree.setColumnWidth(10, 52)
+        self.queue_tree.setColumnWidth(5, 68)
+        self.queue_tree.setColumnWidth(6, 88)
+        self.queue_tree.setColumnWidth(7, 72)
+        self.queue_tree.setColumnWidth(8, 120)
+        self.queue_tree.setColumnWidth(9, 72)
+        self.queue_tree.setColumnWidth(10, 36)
+        self.queue_tree.setColumnWidth(11, 52)
         self.queue_tree.currentItemChanged.connect(self._on_job_select)
         queue_layout.addWidget(self.queue_tree)
 
@@ -479,7 +480,8 @@ class MainWindow(QMainWindow):
         self._btn_move_up.setFixedWidth(30)
         self._btn_move_down = QPushButton("↓")
         self._btn_move_down.setFixedWidth(30)
-        self._btn_save      = QPushButton("💾  Save Queue")
+        self._btn_save      = QPushButton("💾  Manual Save")
+        self._btn_save.setToolTip("Auto-save enabled - use only if needed.")
 
         self._btn_start.clicked.connect(self._start_selected)
         self._btn_start_all.clicked.connect(self._start_all_pending)
@@ -561,11 +563,22 @@ class MainWindow(QMainWindow):
         range_row.addWidget(QLabel("Samples:"))
         self.samples_edit = QLineEdit()
         self.samples_edit.setPlaceholderText("scene default")
-        self.samples_edit.setFixedWidth(90)
+        self.samples_edit.setFixedWidth(70)
         range_row.addWidget(self.samples_edit)
         self._samples_hint = QLabel("")
         self._samples_hint.setStyleSheet(f"color: {C['mauve']}; font-size: 8pt;")
         range_row.addWidget(self._samples_hint)
+        
+        range_row.addSpacing(8)
+        range_row.addWidget(QLabel("Res %:"))
+        self.resolution_edit = QLineEdit()
+        self.resolution_edit.setPlaceholderText("100")
+        self.resolution_edit.setFixedWidth(60)
+        range_row.addWidget(self.resolution_edit)
+        self._resolution_hint = QLabel("")
+        self._resolution_hint.setStyleSheet(f"color: {C['mauve']}; font-size: 8pt;")
+        range_row.addWidget(self._resolution_hint)
+        
         range_row.addStretch()
         form.addWidget(QLabel("Frames:"), 3, 0, Qt.AlignmentFlag.AlignRight)
         form.addLayout(range_row, 3, 1, 1, 2)
@@ -721,6 +734,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready.")
 
+        self.resolution_edit.textChanged.connect(self._on_form_field_changed)
         self._connect_form_dirty_tracking()
 
     # ------------------------------------------------------------------ helpers
@@ -1059,6 +1073,7 @@ class MainWindow(QMainWindow):
         scenes = info.get("scenes", ["Scene"])
         self._current_samples_map = info.get("samples", {})
         self._current_fps_map     = info.get("fps", {})
+        self._current_resolution_map = info.get("resolution_pct", {})
         self.scene_combo.setEnabled(True)
         self.scene_combo.blockSignals(True)
         self.scene_combo.clear()
@@ -1117,6 +1132,7 @@ class MainWindow(QMainWindow):
 
     def _on_scene_changed(self, scene_name: str):
         self._update_samples_hint(scene_name)
+        self._update_resolution_hint(scene_name)
 
     def _update_samples_hint(self, scene_name: str):
         sm = getattr(self, "_current_samples_map", {})
@@ -1124,6 +1140,13 @@ class MainWindow(QMainWindow):
             self._samples_hint.setText(f"(scene: {sm[scene_name]})")
         else:
             self._samples_hint.setText("")
+        
+    def _update_resolution_hint(self, scene_name: str):
+        rm = getattr(self, "_current_resolution_map", {})
+        if scene_name in rm:
+            self._resolution_hint.setText(f"(scene: {rm[scene_name]:.0f}%)")
+        else:
+            self._resolution_hint.setText("")
 
     # ------------------------------------------------------------------ Toggle
 
@@ -1166,6 +1189,10 @@ class MainWindow(QMainWindow):
                 self.samples_edit.setText(str(job.samples_override))
             else:
                 self.samples_edit.clear()
+            if job.resolution_pct is not None:
+                self.resolution_edit.setText(f"{job.resolution_pct:.1f}")
+            else:
+                self.resolution_edit.clear()
             self.use_nodes_btn.setChecked(job.use_nodes)
             self._toggle_use_nodes()
             self._load_blend_info_for_job_edit(job)
@@ -1207,6 +1234,16 @@ class MainWindow(QMainWindow):
         if not os.path.isfile(bpath):
             return None, f"No se encontró el ejecutable de Blender:\n{bpath}"
 
+        resolution_pct: Optional[float] = None
+        raw_res = self.resolution_edit.text().strip()
+        if raw_res:
+            try:
+                resolution_pct = float(raw_res)
+                if not 0 <= resolution_pct <= 100:
+                    raise ValueError
+            except ValueError:
+                return None, "Resolution % must be 0-100 (or leave empty for scene default)."
+
         return {
             "blend_file": blend,
             "scene": scene,
@@ -1215,6 +1252,7 @@ class MainWindow(QMainWindow):
             "frame_start": fs,
             "frame_end": fe,
             "samples_override": samples_override,
+            "resolution_pct": resolution_pct,
             "blender_exec": bpath,
             "blender_profile": bprof,
             "use_nodes": self.use_nodes_btn.isChecked(),
@@ -1232,6 +1270,7 @@ class MainWindow(QMainWindow):
         self.frame_start_spin.valueChanged.connect(self._on_form_field_changed)
         self.frame_end_spin.valueChanged.connect(self._on_form_field_changed)
         self.samples_edit.textChanged.connect(self._on_form_field_changed)
+        self.resolution_edit.textChanged.connect(self._on_form_field_changed)
         self.use_nodes_btn.toggled.connect(self._on_form_field_changed)
 
     def _on_form_field_changed(self, *_args) -> None:
@@ -1276,9 +1315,11 @@ class MainWindow(QMainWindow):
             blender_profile=data["blender_profile"],
             use_nodes=data["use_nodes"],
             samples_override=data["samples_override"],
+            resolution_pct=data.get("resolution_pct"),
         )
         self.jobs.append(job)
         self._refresh_tree()
+        self._auto_save_queue()
         so = data["samples_override"]
         self.status_bar.showMessage(
             f"Job #{job.job_id} added — "
@@ -1315,8 +1356,10 @@ class MainWindow(QMainWindow):
         job.blender_profile = data["blender_profile"]
         job.use_nodes       = data["use_nodes"]
         job.samples_override = data["samples_override"]
+        job.resolution_pct  = data.get("resolution_pct")
 
         self._refresh_tree()
+        self._auto_save_queue()
         if self._selected_job_id == job.job_id:
             self._update_export_ui(job)
             self._update_folder_btn(job)
@@ -1372,6 +1415,7 @@ class MainWindow(QMainWindow):
             self._btn_apply_to_job.setEnabled(False)
 
         self._refresh_tree()
+        self._auto_save_queue()
         self.status_bar.showMessage(f"{len(removed_ids)} job(s) eliminado(s).")
 
     # ------------------------------------------------------------------ Render control
@@ -1535,6 +1579,7 @@ class MainWindow(QMainWindow):
             self._update_folder_btn(job)
             self._btn_apply_to_job.setEnabled(job.status != RenderJob.STATUS_RUNNING)
         self.status_bar.showMessage(f"Job #{job_id} finished: {status}")
+        self._auto_save_queue()
 
         self._start_next_queued_job()
         self._update_simultaneous_checkbox_enabled()
@@ -1578,6 +1623,7 @@ class MainWindow(QMainWindow):
             out_short    = ("…" + job.output_path[-17:]) if len(job.output_path) > 20 else job.output_path
             frame_str    = str(job.current_frame) if job.current_frame is not None else "—"
             samples_str  = str(job.samples_override) if job.samples_override else "def"
+            res_str      = f"{job.resolution_pct:.0f}" if job.resolution_pct is not None else "def"
             blender_str  = self._job_blender_display(job)
             item = QTreeWidgetItem([
                 str(job.job_id),
@@ -1585,6 +1631,7 @@ class MainWindow(QMainWindow):
                 job.scene,
                 blender_str,
                 samples_str,
+                res_str,
                 job.sequence_name or "—",
                 f"{job.frame_start}–{job.frame_end}",
                 out_short,
@@ -1593,9 +1640,9 @@ class MainWindow(QMainWindow):
                 frame_str,
             ])
             item.setToolTip(1, job.blend_file)
-            item.setToolTip(7, job.effective_output_path)
+            item.setToolTip(8, job.effective_output_path)
             color = QColor(STATUS_COLOR.get(job.status, C["text"]))
-            item.setForeground(8, color)
+            item.setForeground(9, color)
             self.queue_tree.addTopLevelItem(item)
 
             combo = QComboBox(self.queue_tree)
@@ -1632,12 +1679,12 @@ class MainWindow(QMainWindow):
         for i in range(self.queue_tree.topLevelItemCount()):
             item = self.queue_tree.topLevelItem(i)
             if item and int(item.text(0)) == job.job_id:
-                item.setText(8, job.status)
-                item.setText(9, f"{job.progress}%")
-                item.setText(10, frame_str)
+                item.setText(9, job.status)
+                item.setText(10, f"{job.progress}%")
+                item.setText(11, frame_str)
                 item.setToolTip(1, job.blend_file)
-                item.setToolTip(7, job.effective_output_path)
-                item.setForeground(8, QColor(STATUS_COLOR.get(job.status, C["text"])))
+                item.setToolTip(8, job.effective_output_path)
+                item.setForeground(9, QColor(STATUS_COLOR.get(job.status, C["text"])))
                 return
 
     def _on_table_blender_changed(self, job_id: int, profile_name: str):
@@ -1705,7 +1752,7 @@ class MainWindow(QMainWindow):
             return
 
         # Update Pause/Resume immediately from the newly selected item
-        current_status = current.text(8)
+        current_status = current.text(9)
         if current_status == RenderJob.STATUS_PAUSED:
             self._btn_pause.setText("▶  Resume")
         else:
@@ -2004,6 +2051,7 @@ class MainWindow(QMainWindow):
                 del job._detected_device
 
         self._refresh_tree()
+        self._auto_save_queue()
 
         if self._selected_job_id in {j.job_id for j in jobs}:
             self.log_edit.clear()
@@ -2039,6 +2087,7 @@ class MainWindow(QMainWindow):
             created.append(new_job)
 
         self._refresh_tree()
+        self._auto_save_queue()
         self.status_bar.showMessage(f"{len(created)} job(s) duplicado(s).")
 
     # ------------------------------------------------------------------ Log colors
@@ -2196,6 +2245,11 @@ class MainWindow(QMainWindow):
     def _save_jobs(self):
         save_config(self.jobs, self._blender_profiles)
         self.status_bar.showMessage(f"Queue saved.")
+
+    def _auto_save_queue(self):
+        """Auto-save the queue after mutations (add/delete/finish)."""
+        self._save_jobs()
+        self.status_bar.showMessage("Queue auto-saved.", 2000)
 
     def _load_jobs(self):
         self.jobs, self._blender_profiles = load_config()

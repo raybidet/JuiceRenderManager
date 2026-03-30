@@ -62,6 +62,7 @@ class RenderJob:
     blender_profile: str = ""      # name in BlenderProfile list; empty = custom path only
     use_nodes: bool = False
     samples_override: Optional[int] = None   # None = use scene default
+    resolution_pct: Optional[float] = None      # None = use scene default (100%)
 
     # ---- runtime state (not persisted) ----
     status: str = field(default="Pending", init=False)
@@ -130,8 +131,14 @@ class RenderJob:
             "blender_profile": self.blender_profile,
             "use_nodes":       self.use_nodes,
             "samples_override": self.samples_override,
+            "resolution_pct": self.resolution_pct if self.resolution_pct is not None else None,
             "status":          self.status,
         }
+
+    @property
+    def effective_resolution_pct(self) -> float:
+        """Return resolution_pct override or scene default fallback (100.0)."""
+        return self.resolution_pct if self.resolution_pct is not None else 100.0
 
     @classmethod
     def from_dict(cls, d: dict) -> RenderJob:
@@ -146,6 +153,7 @@ class RenderJob:
             blender_profile=d.get("blender_profile", ""),
             use_nodes=d.get("use_nodes", False),
             samples_override=d.get("samples_override"),
+            resolution_pct=d.get("resolution_pct"),
         )
         job.job_id = d["job_id"]
         raw_status = d.get("status", cls.STATUS_PENDING)

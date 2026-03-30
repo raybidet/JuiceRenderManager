@@ -1,1 +1,8 @@
-# GitHub Repo Setup Progress\n\n- [x] 1. Install GitHub CLI (winget install --id GitHub.cli) [RESTART TERMINAL OR MANUAL INSTALL NEEDED]\n- [x] 2. git init\n- [x] 3. Create .gitignore\n- [x] 4. Create README.md\n- [ ] 5. git add .\n- [ ] 6. git commit -m \"Initial commit\"\n- [ ] 7. gh auth login\n- [ ] 8. gh repo create BlenderRenderManager --public --source=. --remote=origin --push\n- [ ] 9. Verify (git status, gh repo view)
+# TODO List for BlenderRenderManager
+
+## Completed Steps
+- [x] Stage all git changes with `git add .`
+- [x] Create git commit for latest changes
+
+## Pending Steps
+

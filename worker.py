@@ -62,6 +62,22 @@ try:
 except Exception as _e:
     print('[BRM] WARNING: prefs reload error:', _e)
 
+# ── Re-apply scene-level overrides after prefs reload ──────────────────────
+# Keep these after read_userpref() to avoid any accidental reset.
+if {repr(job.samples_override)} is not None:
+    scene.cycles.samples = {job.samples_override}
+    print('[BRM] Samples override (post-prefs):', {job.samples_override})
+else:
+    print('[BRM] Samples: scene default =', scene.cycles.samples)
+
+if {repr(job.resolution_pct)} is not None:
+    _res_pct = int(round(float({job.resolution_pct})))
+    _res_pct = max(0, min(100, _res_pct))
+    scene.render.resolution_percentage = _res_pct
+    print('[BRM] Resolution % override (post-prefs):', _res_pct)
+else:
+    print('[BRM] Resolution %: scene default =', scene.render.resolution_percentage)
+
 # ── Apply GPU from reloaded prefs ──────────────────────────────────────────
 try:
     _cprefs = bpy.context.preferences.addons['cycles'].preferences
@@ -82,10 +98,13 @@ except Exception as _e:
 
 print('[BRM] cycles.device  =', scene.cycles.device)
 print('[BRM] render.engine  =', scene.render.engine)
+print('[BRM] resolution_percentage =', scene.render.resolution_percentage)
+print('[BRM] resolution_x =', scene.render.resolution_x)
+print('[BRM] resolution_y =', scene.render.resolution_y)
 """
 
-
 def get_blend_info(blend_file: str, blender_exec: str) -> dict:
+
     """
     Query a .blend file for scene names, Cycles sample counts, and FPS.
     Returns {'scenes': [...], 'samples': {scene_name: int}, 'fps': {scene_name: float}}.
@@ -194,6 +213,7 @@ class RenderWorker:
         self._log(
             f"[INFO] Nodes: {'ON' if job.use_nodes else 'OFF'} | "
             f"Samples: {job.samples_override or 'scene default'} | "
+            f"Res%: {job.resolution_pct if job.resolution_pct is not None else 'scene default'} | "
             f"Output: {job.effective_output_path}"
         )
 
