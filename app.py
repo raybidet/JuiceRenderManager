@@ -1,5 +1,5 @@
 """
-app.py — Entry point for Blender Render Manager.
+app.py — Entry point for Juice | Render Manager for Blender.
 
 Usage:
     python app.py
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     _check_pillow()
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Blender Render Manager")
+    app.setApplicationName("Juice | Render Manager for Blender")
 
     window = MainWindow()
     window.show()

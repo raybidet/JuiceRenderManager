@@ -13,6 +13,7 @@ to CPU.  We inject a Python script (--python <tmpfile>) that:
 This is the same sequence Blender performs when launched normally.
 """
 from __future__ import annotations
+import json
 import os
 import sys
 import subprocess
@@ -134,23 +135,37 @@ print('[BRM] resolution_y =', scene.render.resolution_y)
 """
 
 def get_blend_info(blend_file: str, blender_exec: str) -> dict:
-
     """
-    Query a .blend file for scene names, Cycles sample counts, and FPS.
-    Returns {'scenes': [...], 'samples': {scene_name: int}, 'fps': {scene_name: float}}.
+    Query a .blend file for scene names, Cycles sample counts, FPS, and resolution %.
+    Returns:
+        {
+            'scenes': [...],
+            'samples': {scene_name: int},
+            'fps': {scene_name: float},
+            'resolution_pct': {scene_name: float},
+        }
+    Uses JSON output to avoid delimiter conflicts with scene names.
     Runs Blender headless — call from a worker thread only.
     """
+    # JSON output avoids any delimiter collision with scene names.
+    # chr(9) = tab used as record separator between scenes (safe: Blender
+    # strips leading/trailing whitespace from scene names).
     script = (
-        "import bpy;"
-        "rows=[];"
-        "[rows.append("
-        "  s.name"
-        "  +'|'+str(getattr(s.cycles,'samples',128))"
-        "  +'|'+str(round(s.render.fps/max(s.render.fps_base,0.001),3))"
-        ") for s in bpy.data.scenes];"
-        "print('BLEND_INFO:'+';'.join(rows))"
+        "import bpy, json;"
+        "data=[{"
+        "'name':s.name,"
+        "'samples':getattr(s.cycles,'samples',128),"
+        "'fps':round(s.render.fps/max(s.render.fps_base,0.001),3),"
+        "'resolution_pct':float(s.render.resolution_percentage)"
+        "} for s in bpy.data.scenes];"
+        "print('BLEND_INFO:'+json.dumps(data,ensure_ascii=False))"
     )
-    fallback = {"scenes": ["Scene"], "samples": {"Scene": 128}, "fps": {"Scene": 24.0}}
+    fallback = {
+        "scenes": ["Scene"],
+        "samples": {"Scene": 128},
+        "fps": {"Scene": 24.0},
+        "resolution_pct": {"Scene": 100.0},
+    }
     try:
         r = subprocess.run(
             [blender_exec, "--background", blend_file, "--python-expr", script],
@@ -159,22 +174,33 @@ def get_blend_info(blend_file: str, blender_exec: str) -> dict:
         )
         for line in r.stdout.splitlines():
             if line.startswith("BLEND_INFO:"):
-                scenes, samples, fps = [], {}, {}
-                for entry in line[len("BLEND_INFO:"):].split(";"):
-                    parts = entry.split("|")
-                    if len(parts) >= 2:
-                        name = parts[0].strip()
-                        scenes.append(name)
-                        try:
-                            samples[name] = int(parts[1])
-                        except (ValueError, IndexError):
-                            samples[name] = 128
-                        try:
-                            fps[name] = float(parts[2])
-                        except (ValueError, IndexError):
-                            fps[name] = 24.0
+                raw = json.loads(line[len("BLEND_INFO:"):])
+                scenes: list[str] = []
+                samples: dict[str, int] = {}
+                fps: dict[str, float] = {}
+                resolution_pct: dict[str, float] = {}
+                for entry in raw:
+                    name = str(entry.get("name", "Scene"))
+                    scenes.append(name)
+                    try:
+                        samples[name] = int(entry.get("samples", 128))
+                    except (ValueError, TypeError):
+                        samples[name] = 128
+                    try:
+                        fps[name] = float(entry.get("fps", 24.0))
+                    except (ValueError, TypeError):
+                        fps[name] = 24.0
+                    try:
+                        resolution_pct[name] = float(entry.get("resolution_pct", 100.0))
+                    except (ValueError, TypeError):
+                        resolution_pct[name] = 100.0
                 if scenes:
-                    return {"scenes": scenes, "samples": samples, "fps": fps}
+                    return {
+                        "scenes": scenes,
+                        "samples": samples,
+                        "fps": fps,
+                        "resolution_pct": resolution_pct,
+                    }
     except Exception:
         pass
     return fallback

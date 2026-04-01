@@ -1,5 +1,5 @@
 """
-ipc_server.py — lightweight local TCP JSON-line server for Blender Render Manager.
+ipc_server.py — lightweight local TCP JSON-line server for Juice | Render Manager for Blender.
 
 Protocol:
 - Bind: 127.0.0.1:8765
@@ -28,7 +28,7 @@ import threading
 from typing import Callable, Optional
 
 
-class BRMIPCServer:
+class JuiceIPCServer:
     """Background TCP server dispatching parsed JSON messages to a callback."""
 
     def __init__(
@@ -56,7 +56,7 @@ class BRMIPCServer:
         self._sock.listen(8)
         self._sock.settimeout(0.5)
 
-        self._thread = threading.Thread(target=self._serve_loop, name="BRMIPCServer", daemon=True)
+        self._thread = threading.Thread(target=self._serve_loop, name="JuiceIPCServer", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -131,3 +131,4 @@ class BRMIPCServer:
             conn.sendall(payload)
         except Exception:
             pass
+

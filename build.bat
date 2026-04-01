@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
-title Blender Render Manager - Build
+title Juice | Render Manager for Blender - Build
 
 echo.
 echo  ============================================================
-echo   Blender Render Manager v1.0.0 - Build Script
+echo   Juice | Render Manager for Blender v1.0.0 - Build Script
 echo   Franco Basualdo - Tryhard VFX
 echo  ============================================================
 echo.
@@ -75,16 +75,16 @@ echo.
 
 :: ── 7. Limpiar builds anteriores ─────────────────────────────────────────────
 echo [5/6] Construyendo ejecutable...
-if exist "dist\BlenderRenderManager" (
+if exist "dist\Juice" (
     echo       Limpiando build anterior...
-    rmdir /s /q "dist\BlenderRenderManager"
+    rmdir /s /q "dist\Juice"
 )
-if exist "build\BlenderRenderManager" (
-    rmdir /s /q "build\BlenderRenderManager"
+if exist "build\Juice" (
+    rmdir /s /q "build\Juice"
 )
 
 :: ── 8. Ejecutar PyInstaller ──────────────────────────────────────────────────
-"%PYTHON_VENV%" -m PyInstaller BlenderRenderManager.spec --clean --noconfirm
+"%PYTHON_VENV%" -m PyInstaller Juice.spec --clean --noconfirm
 if errorlevel 1 (
     echo.
     echo [ERROR] PyInstaller fallo. Revisa los mensajes de error arriba.
@@ -93,8 +93,8 @@ if errorlevel 1 (
 )
 
 :: ── 9. Verificar resultado ───────────────────────────────────────────────────
-if not exist "dist\BlenderRenderManager\BlenderRenderManager.exe" (
-    echo [ERROR] No se encontro el ejecutable en dist\BlenderRenderManager\
+if not exist "dist\Juice\Juice.exe" (
+    echo [ERROR] No se encontro el ejecutable en dist\Juice\
     pause
     exit /b 1
 )
@@ -125,8 +125,8 @@ echo.
 echo  ============================================================
 echo   BUILD EXITOSO!
 echo.
-echo   Ejecutable app: dist\BlenderRenderManager\BlenderRenderManager.exe
-echo   Instalador:     dist\BlenderRenderManager_Setup_v1.0.0.exe (si ISCC estaba disponible)
+echo   Ejecutable app: dist\Juice\Juice.exe
+echo   Instalador:     dist\Juice_Setup_v1.0.0.exe (si ISCC estaba disponible)
 echo  ============================================================
 echo.
 
@@ -138,3 +138,4 @@ if /i "!OPEN!"=="S" (
 
 endlocal
 pause
+

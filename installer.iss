@@ -1,15 +1,16 @@
 ; ============================================================
-;  Blender Render Manager - Inno Setup Script
+;  Juice | Render Manager for Blender - Inno Setup Script
 ;  Compilar con Inno Setup 6: https://jrsoftware.org/isinfo.php
 ;
 ;  REQUISITO PREVIO: ejecutar build.bat primero para generar
-;  la carpeta dist\BlenderRenderManager\
+;  la carpeta dist\Juice\
 ; ============================================================
 
-#define AppName      "Blender Render Manager"
+#define AppName      "Juice | Render Manager for Blender"
+#define AppDirName   "Juice Render Manager"
 #define AppVersion   "1.0.0"
 #define AppPublisher "Franco Basualdo - Tryhard VFX"
-#define AppExeName   "BlenderRenderManager.exe"
+#define AppExeName   "Juice.exe"
 #define AppID        "{{A3F2C1D4-8B7E-4F9A-B2C3-D4E5F6A7B8C9}"
 
 [Setup]
@@ -21,7 +22,9 @@ AppPublisher={#AppPublisher}
 AppCopyright=Copyright (C) 2024 {#AppPublisher}
 
 ; Directorio de instalacion por defecto
-DefaultDirName={autopf}\{#AppName}
+; NOTE: AppName contains '|' which is invalid in Windows paths, so we use
+; AppDirName (without the pipe) for the actual install directory.
+DefaultDirName={autopf}\{#AppDirName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
 
@@ -32,7 +35,7 @@ UninstallDisplayName={#AppName}
 
 ; Archivo de salida del instalador
 OutputDir=dist
-OutputBaseFilename=BlenderRenderManager_Setup_v{#AppVersion}
+OutputBaseFilename=Juice_Setup_v{#AppVersion}
 
 ; Compresion
 Compression=lzma2/ultra64
@@ -68,7 +71,7 @@ Name: "quicklaunchicon"; Description: "Crear acceso directo en la barra de &tare
 
 [Files]
 ; Todos los archivos del build de PyInstaller
-Source: "dist\BlenderRenderManager\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Juice\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Acceso directo en el Menu Inicio
@@ -87,7 +90,7 @@ Filename: "{app}\{#AppExeName}"; Description: "Iniciar {#AppName}"; Flags: nowai
 
 [UninstallDelete]
 ; Limpiar archivos generados por la app en AppData al desinstalar
-Type: filesandordirs; Name: "{userappdata}\BlenderRenderManager"
+Type: filesandordirs; Name: "{userappdata}\Juice"
 
 [Registry]
 ; Registrar en "Agregar o quitar programas" con informacion extra
@@ -125,3 +128,4 @@ begin
     end;
   end;
 end;
+

@@ -1,9 +1,9 @@
 bl_info = {
-    "name": "Juice | Render Manager for Blender Sender",
-    "author": "BRM Integration",
+    "name": "Juice | Render Manager for Blender",
+    "author": "Juice Integration",
     "version": (1, 0, 0),
     "blender": (3, 0, 0),
-    "location": "View3D > Sidebar > BRM",
+    "location": "View3D > Sidebar > Juice",
     "description": "Send current scene render settings to Juice | Render Manager for Blender",
     "category": "Render",
 }
@@ -62,7 +62,7 @@ def _send_json_line(host, port, data, timeout=1.5):
         return {"ok": False, "error": f"Invalid response JSON: {e}"}
 
 
-def _launch_brm(executable_path):
+def _launch_juice(executable_path):
     if executable_path:
         cmd = [bpy.path.abspath(executable_path)]
     else:
@@ -70,24 +70,24 @@ def _launch_brm(executable_path):
     subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
 
 
-class BRMProperties(bpy.types.PropertyGroup):
+class JuiceProperties(bpy.types.PropertyGroup):
     host: StringProperty(name="Host", default="127.0.0.1")
     port: IntProperty(name="Port", default=8765, min=1, max=65535)
-    brm_path: StringProperty(
-        name="BRM Executable/Python Script",
+    juice_path: StringProperty(
+        name="Juice Executable/Python Script",
         subtype="FILE_PATH",
         default="",
         description="Path to Juice | Render Manager for Blender executable or app.py",
     )
 
 
-class BRM_OT_SendToManager(bpy.types.Operator):
-    bl_idname = "brm.send_to_manager"
+class Juice_OT_SendToManager(bpy.types.Operator):
+    bl_idname = "juice.send_to_manager"
     bl_label = "Send to Juice | Render Manager for Blender"
     bl_description = "Send current file/scene settings to Juice (opens Juice if needed)"
 
     def execute(self, context):
-        props = context.scene.brm_props
+        props = context.scene.juice_props
         payload = _collect_payload(context)
 
         if not payload["payload"]["blend_file"]:
@@ -98,16 +98,16 @@ class BRM_OT_SendToManager(bpy.types.Operator):
         try:
             resp = _send_json_line(props.host, props.port, payload, timeout=1.5)
             if resp.get("ok"):
-                self.report({"INFO"}, "Job enviado a Juice | Render Manager for Blender")
+                self.report({"INFO"}, "Job enviado a Juice | Render Manager for Blender.")
                 return {"FINISHED"}
         except Exception:
             resp = {"ok": False}
 
-        # Launch BRM and retry
+        # Launch Juice and retry
         try:
-            _launch_brm(props.brm_path)
+            _launch_juice(props.juice_path)
         except Exception as e:
-            self.report({"ERROR"}, f"No se pudo abrir BRM: {e}")
+            self.report({"ERROR"}, f"No se pudo abrir Juice: {e}")
             return {"CANCELLED"}
 
         time.sleep(2.0)
@@ -115,26 +115,26 @@ class BRM_OT_SendToManager(bpy.types.Operator):
             try:
                 resp = _send_json_line(props.host, props.port, payload, timeout=1.5)
                 if resp.get("ok"):
-                    self.report({"INFO"}, "BRM abierto y job enviado.")
+                    self.report({"INFO"}, "Juice abierto y job enviado.")
                     return {"FINISHED"}
             except Exception:
                 pass
             time.sleep(1.0)
 
-        self.report({"ERROR"}, "No se pudo conectar a BRM tras abrirlo.")
+        self.report({"ERROR"}, "No se pudo conectar a Juice tras abrirlo.")
         return {"CANCELLED"}
 
 
-class BRM_PT_Panel(bpy.types.Panel):
+class Juice_PT_Panel(bpy.types.Panel):
     bl_label = "Juice | Render Manager for Blender"
-    bl_idname = "BRM_PT_panel"
+    bl_idname = "JUICE_PT_panel"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "BRM"
+    bl_category = "Juice"
 
     def draw(self, context):
         layout = self.layout
-        props = context.scene.brm_props
+        props = context.scene.juice_props
         scene = context.scene
 
         col = layout.column(align=True)
@@ -152,29 +152,30 @@ class BRM_PT_Panel(bpy.types.Panel):
         layout.separator()
         layout.prop(props, "host")
         layout.prop(props, "port")
-        layout.prop(props, "brm_path")
-        layout.operator("brm.send_to_manager", icon="EXPORT")
+        layout.prop(props, "juice_path")
+        layout.operator("juice.send_to_manager", icon="EXPORT")
 
 
 classes = (
-    BRMProperties,
-    BRM_OT_SendToManager,
-    BRM_PT_Panel,
+    JuiceProperties,
+    Juice_OT_SendToManager,
+    Juice_PT_Panel,
 )
 
 
 def register():
     for c in classes:
         bpy.utils.register_class(c)
-    bpy.types.Scene.brm_props = bpy.props.PointerProperty(type=BRMProperties)
+    bpy.types.Scene.juice_props = bpy.props.PointerProperty(type=JuiceProperties)
 
 
 def unregister():
-    if hasattr(bpy.types.Scene, "brm_props"):
-        del bpy.types.Scene.brm_props
+    if hasattr(bpy.types.Scene, "juice_props"):
+        del bpy.types.Scene.juice_props
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
 
 
 if __name__ == "__main__":
     register()
+

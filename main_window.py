@@ -1,5 +1,5 @@
 """
-main_window.py — PyQt6 main window for Blender Render Manager.
+main_window.py — PyQt6 main window for Juice | Render Manager for Blender.
 
 PyQt6 runs the UI in the main thread but dispatches render work to QThreads.
 Cross-thread communication uses Qt Signals, which are thread-safe by design —
@@ -45,7 +45,7 @@ from models import (
     resolve_blender_exec,
 )
 from worker import RenderWorker, get_blend_info
-from ipc_server import BRMIPCServer
+from ipc_server import JuiceIPCServer
 
 
 
@@ -332,7 +332,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Blender Render Manager")
+        self.setWindowTitle("Juice | Render Manager for Blender")
         self._set_app_icon()
         self.resize(1300, 820)
         self.setMinimumSize(1000, 660)
@@ -353,7 +353,7 @@ class MainWindow(QMainWindow):
         self._sequential_queue: list[int]               = []
         self._sequential_target_ids: set[int]           = set()
 
-        self._ipc_server: BRMIPCServer | None           = None
+        self._ipc_server: JuiceIPCServer | None           = None
         self._ipc_queue: queue.Queue[dict]              = queue.Queue()
 
         self.setAcceptDrops(True)
@@ -401,7 +401,7 @@ class MainWindow(QMainWindow):
 
         # ── Top bar ──────────────────────────────────────────────────────
         top = QHBoxLayout()
-        title = QLabel("Blender Render Manager")
+        title = QLabel("Juice | Render Manager for Blender")
         title.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {C['mauve']};")
         top.addWidget(title)
@@ -1062,7 +1062,7 @@ class MainWindow(QMainWindow):
         if not blend or not os.path.isfile(blend):
             QMessageBox.warning(self, "Warning", "Please select a valid .blend file first.")
             return
-        key = f"{blend}|{self.blender_exec}"
+        key = f"{blend}\n{self.blender_exec}"
         if key in self._blend_info_cache:
             self._apply_blend_info(self._blend_info_cache[key])
             return
@@ -1132,7 +1132,7 @@ class MainWindow(QMainWindow):
             return
 
         bexec = resolve_blender_exec(job, self._blender_profiles)
-        key = f"{blend}|{bexec}"
+        key = f"{blend}\n{bexec}"
         if key in self._blend_info_cache:
             self._apply_blend_info(self._blend_info_cache[key], select_scene=scene)
             return
@@ -1293,7 +1293,7 @@ class MainWindow(QMainWindow):
             return {"ok": True, "queued": True}
 
         try:
-            self._ipc_server = BRMIPCServer(host="127.0.0.1", port=8765, on_message=_on_message)
+            self._ipc_server = JuiceIPCServer(host="127.0.0.1", port=8765, on_message=_on_message)
             self._ipc_server.start()
             self.status_bar.showMessage("IPC listener activo en 127.0.0.1:8765", 2500)
         except Exception as e:
@@ -2534,7 +2534,7 @@ class MainWindow(QMainWindow):
 
     def _get_fps_for_job(self, job: RenderJob) -> float:
         """Return the FPS for a job's scene from the blend info cache, or 24.0."""
-        key = f"{job.blend_file}|{resolve_blender_exec(job, self._blender_profiles)}"
+        key = f"{job.blend_file}\n{resolve_blender_exec(job, self._blender_profiles)}"
         fps_map = self._blend_info_cache.get(key, {}).get("fps", {})
         return fps_map.get(job.scene, 24.0)
 

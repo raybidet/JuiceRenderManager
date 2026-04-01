@@ -1,5 +1,5 @@
 """
-models.py — RenderJob data model and JSON persistence.
+models.py — RenderJob data model and JSON persistence for Juice | Render Manager for Blender.
 """
 from __future__ import annotations
 import json
@@ -37,7 +37,7 @@ import sys as _sys
 if getattr(_sys, "frozen", False):
     _cfg_dir = os.path.join(
         os.environ.get("APPDATA", os.path.expanduser("~")),
-        "BlenderRenderManager",
+        "Juice",
     )
 else:
     _cfg_dir = os.path.dirname(os.path.abspath(__file__))
@@ -187,6 +187,18 @@ def save_config(jobs: list[RenderJob], profiles: list[BlenderProfile]) -> None:
 
 
 def load_config() -> tuple[list[RenderJob], list[BlenderProfile]]:
+    # Migrate old config if exists
+    old_dir = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "BlenderRenderManager")
+    old_config = os.path.join(old_dir, "render_jobs.json")
+    if os.path.isfile(old_config) and not os.path.isfile(CONFIG_FILE):
+        import shutil
+        try:
+            os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+            shutil.copy2(old_config, CONFIG_FILE)
+            print(f"[Juice] Migrated config from {old_config}")
+        except Exception as e:
+            print(f"[Juice] Config migration failed: {e}")
+
     if not os.path.isfile(CONFIG_FILE):
         return [], default_blender_profiles()
     try:
@@ -232,3 +244,4 @@ def save_jobs(jobs: list[RenderJob]) -> None:
 def load_jobs() -> list[RenderJob]:
     jobs, _ = load_config()
     return jobs
+

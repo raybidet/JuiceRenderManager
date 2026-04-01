@@ -1,4 +1,4 @@
-# Blender Render Manager — Project Context
+# Juice | Render Manager for Blender — Project Context
 
 ## Estructura del proyecto
 ```
