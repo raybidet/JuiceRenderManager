@@ -1,141 +1,136 @@
 @echo off
 setlocal enabledelayedexpansion
-title Juice | Render Manager for Blender - Build
+title Juice Render Manager for Blender - Build
 
 echo.
 echo  ============================================================
-echo   Juice | Render Manager for Blender v1.0.0 - Build Script
+echo   Juice Render Manager for Blender - Build Script
 echo   Franco Basualdo - Tryhard VFX
 echo  ============================================================
 echo.
 
-:: ── 1. Verificar Python ──────────────────────────────────────────────────────
+REM Ir al directorio del script
+cd /d "%~dp0"
+
+REM 1) Verificar Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python no encontrado en el PATH.
-    echo         Instala Python 3.10+ desde https://www.python.org/downloads/
-    echo         Asegurate de marcar "Add Python to PATH" durante la instalacion.
+    echo [ERROR] Python no encontrado en PATH.
+    echo         Instala Python 3.10+ y marca "Add Python to PATH".
     pause
     exit /b 1
 )
 
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do set PYVER=%%v
-echo [OK] %PYVER% detectado.
+echo [OK] %PYVER%
 echo.
 
-:: ── 2. Ir al directorio del script ───────────────────────────────────────────
-cd /d "%~dp0"
-
-:: ── 3. Crear/usar entorno virtual local ──────────────────────────────────────
-echo [1/6] Preparando entorno virtual local (.venv)...
+REM 2) Crear/usar .venv
+echo [1/7] Preparando entorno virtual (.venv)...
 if not exist ".venv\Scripts\python.exe" (
     python -m venv .venv
     if errorlevel 1 (
-        echo [ERROR] No se pudo crear el entorno virtual .venv
+        echo [ERROR] No se pudo crear .venv
         pause
         exit /b 1
     )
 )
 set "PYTHON_VENV=.venv\Scripts\python.exe"
-echo [OK] Entorno virtual listo: %PYTHON_VENV%
+echo [OK] Entorno virtual listo.
 echo.
 
-:: ── 4. Actualizar pip en el entorno virtual ──────────────────────────────────
-echo [2/6] Actualizando pip en .venv...
-"%PYTHON_VENV%" -m pip install --upgrade pip --quiet
+REM 3) Actualizar pip
+echo [2/7] Actualizando pip...
+"%PYTHON_VENV%" -m pip install --upgrade pip
 if errorlevel 1 (
-    echo [ERROR] Fallo al actualizar pip en .venv
+    echo [ERROR] Fallo al actualizar pip.
     pause
     exit /b 1
 )
-echo [OK] pip actualizado en .venv
+echo [OK] pip actualizado.
 echo.
 
-:: ── 5. Instalar dependencias de la app ───────────────────────────────────────
-echo [3/6] Instalando dependencias de la app (PyQt6, Pillow) en .venv...
-"%PYTHON_VENV%" -m pip install PyQt6 Pillow --quiet
+REM 4) Instalar dependencias
+echo [3/7] Instalando dependencias...
+"%PYTHON_VENV%" -m pip install PyQt6 Pillow pyinstaller
 if errorlevel 1 (
-    echo [ERROR] Fallo la instalacion de dependencias en .venv.
+    echo [ERROR] Fallo instalando dependencias.
     pause
     exit /b 1
 )
 echo [OK] Dependencias instaladas.
 echo.
 
-:: ── 6. Instalar PyInstaller en .venv ─────────────────────────────────────────
-echo [4/6] Instalando PyInstaller en .venv...
-"%PYTHON_VENV%" -m pip install pyinstaller --quiet
-if errorlevel 1 (
-    echo [ERROR] Fallo la instalacion de PyInstaller en .venv.
-    pause
-    exit /b 1
-)
-echo [OK] PyInstaller listo.
+REM 5) Limpiar salida anterior
+echo [4/7] Limpiando builds anteriores...
+if exist "dist" rmdir /s /q "dist"
+if exist "build" rmdir /s /q "build"
+echo [OK] Limpieza completada.
 echo.
 
-:: ── 7. Limpiar builds anteriores ─────────────────────────────────────────────
-echo [5/6] Construyendo ejecutable...
-if exist "dist\Juice" (
-    echo       Limpiando build anterior...
-    rmdir /s /q "dist\Juice"
-)
-if exist "build\Juice" (
-    rmdir /s /q "build\Juice"
-)
+REM 6) Build con PyInstaller (sin .spec fijo)
+echo [5/7] Generando ejecutable con PyInstaller...
 
-:: ── 8. Ejecutar PyInstaller ──────────────────────────────────────────────────
-"%PYTHON_VENV%" -m PyInstaller Juice.spec --clean --noconfirm
+"%PYTHON_VENV%" -m PyInstaller ^
+  --noconfirm ^
+  --clean ^
+  --name "Juice" ^
+  --windowed ^
+  --icon "logo.ico" ^
+  --add-data "logo.png;." ^
+  "app.py"
+
 if errorlevel 1 (
-    echo.
-    echo [ERROR] PyInstaller fallo. Revisa los mensajes de error arriba.
+    echo [ERROR] PyInstaller falló.
     pause
     exit /b 1
 )
 
-:: ── 9. Verificar resultado ───────────────────────────────────────────────────
 if not exist "dist\Juice\Juice.exe" (
-    echo [ERROR] No se encontro el ejecutable en dist\Juice\
+    echo [ERROR] No se encontró dist\Juice\Juice.exe tras el build.
     pause
     exit /b 1
 )
-echo [OK] Ejecutable generado correctamente.
+echo [OK] Ejecutable generado: dist\Juice\Juice.exe
 echo.
 
-:: ── 10. Compilar instalador con Inno Setup (si existe ISCC) ─────────────────
-echo [6/6] Compilando instalador con Inno Setup...
+REM 7) Compilar instalador con Inno Setup
+echo [6/7] Compilando instalador (Inno Setup)...
 set "ISCC_EXE="
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC_EXE=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if not defined ISCC_EXE if exist "C:\Program Files\Inno Setup 6\ISCC.exe" set "ISCC_EXE=C:\Program Files\Inno Setup 6\ISCC.exe"
 
 if not defined ISCC_EXE (
-    echo [WARN] No se encontro ISCC.exe (Inno Setup 6).
-    echo        El .exe de la app esta listo, pero el instalador no se compilo automaticamente.
+    echo [WARN] No se encontró ISCC.exe.
+    echo        El ejecutable está listo en dist\Juice\Juice.exe
     echo        Compila manualmente installer.iss desde Inno Setup Compiler.
 ) else (
     "%ISCC_EXE%" "installer.iss"
     if errorlevel 1 (
-        echo [ERROR] Fallo la compilacion del instalador con Inno Setup.
+        echo [ERROR] Falló la compilación de installer.iss
         pause
         exit /b 1
     )
-    echo [OK] Instalador compilado correctamente en la carpeta dist\
+)
+
+echo [7/7] Verificando instalador...
+if exist "dist\Juice_Setup_v1.1.0.exe" (
+    echo [OK] Instalador generado: dist\Juice_Setup_v1.1.0.exe
+) else (
+    echo [WARN] No se encontró dist\Juice_Setup_v1.1.0.exe
+    echo        Revisa OutputBaseFilename/AppVersion en installer.iss
 )
 
 echo.
 echo  ============================================================
-echo   BUILD EXITOSO!
-echo.
-echo   Ejecutable app: dist\Juice\Juice.exe
-echo   Instalador:     dist\Juice_Setup_v1.0.0.exe (si ISCC estaba disponible)
+echo   BUILD FINALIZADO
+echo   Ejecutable: dist\Juice\Juice.exe
+echo   Instalador: dist\Juice_Setup_v1.1.0.exe
 echo  ============================================================
 echo.
 
-:: ── 11. Abrir carpeta de salida ──────────────────────────────────────────────
-set /p OPEN="Abrir carpeta dist\ ? [S/N]: "
-if /i "!OPEN!"=="S" (
-    explorer "dist"
-)
+set /p OPEN_DIST="Abrir carpeta dist\ ? [S/N]: "
+if /i "!OPEN_DIST!"=="S" explorer "dist"
 
 endlocal
 pause
-
