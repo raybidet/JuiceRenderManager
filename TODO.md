@@ -1,3 +1,4 @@
-- [x] Corregir macos.spec para eliminar uso de MACOSX no compatible con PyInstaller 6
-- [x] Mantener configuración de app macOS (universal2, icon, bundle id, plist)
-- [ ] Validar estructura de build esperada por workflow (dist/Juice.app)
+- [x] Crear workflow GitHub Actions para build Windows onefile (`.github/workflows/build-windows.yml`)
+- [x] Subir artifact del ejecutable único `dist/Juice.exe`
+- [x] Publicar release en tags (adjuntar `Juice.exe`)
+- [x] Actualizar README con sección de build Windows en GitHub Actions

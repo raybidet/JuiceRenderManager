@@ -38,6 +38,28 @@ Salidas esperadas:
 - `pyinstaller Juice.spec --clean --noconfirm`
 - Compilar `installer.iss` con Inno Setup Compiler (ISCC o GUI)
 
+### Build Windows en GitHub Actions (onefile)
+Se agregó el workflow:
+
+- `.github/workflows/build-windows.yml`
+
+Qué hace:
+1. Corre en `windows-latest`
+2. Instala dependencias desde `requirements.txt`
+3. Compila con PyInstaller en **archivo único**:
+   - `--onefile`
+   - `--windowed`
+   - `--name Juice`
+   - `--icon logo.ico`
+   - `--add-data "logo.png;."`
+   - entrada: `app.py`
+4. Verifica que exista `dist/Juice.exe`
+5. Sube artifact: `Juice-windows-onefile-<sha>`
+6. Si el trigger es un tag, crea Release y adjunta `dist/Juice.exe`
+
+Salida esperada:
+- `dist/Juice.exe` (ejecutable distribuible en un solo archivo)
+
 ## Blender Addon
 1. Abrir Blender
 2. Edit → Preferences → Add-ons → Install
