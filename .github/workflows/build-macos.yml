@@ -33,9 +33,21 @@ jobs:
       run: |
         which blender || echo "Blender not in PATH (expected in CI)"
 
+    - name: Debug workspace and locate spec
+      run: |
+        pwd
+        ls -la
+        find . -name "macos.spec"
+
     - name: Build with PyInstaller
       run: |
-        pyinstaller macos.spec --clean --noconfirm
+        SPEC_PATH=$(find . -name "macos.spec" | head -n 1)
+        if [ -z "$SPEC_PATH" ]; then
+          echo "ERROR: macos.spec not found in repository checkout"
+          exit 1
+        fi
+        echo "Using spec file: $SPEC_PATH"
+        pyinstaller "$SPEC_PATH" --clean --noconfirm
         ls -la dist/Juice.app/Contents/MacOS/
 
     - name: Test App Bundle
