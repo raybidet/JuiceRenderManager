@@ -167,40 +167,40 @@ def get_blend_info(blend_file: str, blender_exec: str) -> dict:
         "resolution_pct": {"Scene": 100.0},
     }
     try:
-        r = subprocess.run(
-            [blender_exec, "--background", blend_file, "--python-expr", script],
-            capture_output=True, encoding="utf-8", errors="replace", timeout=45,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-        )
-        for line in r.stdout.splitlines():
-            if line.startswith("BLEND_INFO:"):
-                raw = json.loads(line[len("BLEND_INFO:"):])
-                scenes: list[str] = []
-                samples: dict[str, int] = {}
-                fps: dict[str, float] = {}
-                resolution_pct: dict[str, float] = {}
-                for entry in raw:
-                    name = str(entry.get("name", "Scene"))
-                    scenes.append(name)
-                    try:
-                        samples[name] = int(entry.get("samples", 128))
-                    except (ValueError, TypeError):
-                        samples[name] = 128
-                    try:
-                        fps[name] = float(entry.get("fps", 24.0))
-                    except (ValueError, TypeError):
-                        fps[name] = 24.0
-                    try:
-                        resolution_pct[name] = float(entry.get("resolution_pct", 100.0))
-                    except (ValueError, TypeError):
-                        resolution_pct[name] = 100.0
-                if scenes:
-                    return {
-                        "scenes": scenes,
-                        "samples": samples,
-                        "fps": fps,
-                        "resolution_pct": resolution_pct,
-                    }
+            r = subprocess.run(
+                [blender_exec, "--background", blend_file, "--python-expr", script],
+                capture_output=True, encoding="utf-8", errors="replace", timeout=45,
+                creationflags=0,
+            )
+            for line in r.stdout.splitlines():
+                if line.startswith("BLEND_INFO:"):
+                    raw = json.loads(line[len("BLEND_INFO:"):])
+                    scenes: list[str] = []
+                    samples: dict[str, int] = {}
+                    fps: dict[str, float] = {}
+                    resolution_pct: dict[str, float] = {}
+                    for entry in raw:
+                        name = str(entry.get("name", "Scene"))
+                        scenes.append(name)
+                        try:
+                            samples[name] = int(entry.get("samples", 128))
+                        except (ValueError, TypeError):
+                            samples[name] = 128
+                        try:
+                            fps[name] = float(entry.get("fps", 24.0))
+                        except (ValueError, TypeError):
+                            fps[name] = 24.0
+                        try:
+                            resolution_pct[name] = float(entry.get("resolution_pct", 100.0))
+                        except (ValueError, TypeError):
+                            resolution_pct[name] = 100.0
+                    if scenes:
+                        return {
+                            "scenes": scenes,
+                            "samples": samples,
+                            "fps": fps,
+                            "resolution_pct": resolution_pct,
+                        }
     except Exception:
         pass
     return fallback
@@ -284,7 +284,7 @@ class RenderWorker:
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                creationflags=0,
             )
             job.process = proc
 

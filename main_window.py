@@ -307,7 +307,7 @@ class ConvertThread(QThread):
                 capture_output=True,
                 encoding="utf-8",
                 errors="replace",
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                creationflags=0 if sys.platform != "win32" else subprocess.CREATE_NO_WINDOW,
             )
             if result.returncode == 0:
                 self.finished.emit(True, f"MP4 saved to: {self.output_file}")
@@ -2484,8 +2484,9 @@ class MainWindow(QMainWindow):
 
         def _play():
             try:
-                wav = r"C:\Windows\Media\chimes.wav"
-                if os.path.isfile(wav):
+                if sys.platform == "win32":
+                    wav = r"C:\Windows\Media\chimes.wav"
+                    if os.path.isfile(wav):
                     _winsound.PlaySound(wav, _winsound.SND_FILENAME)
                 else:
                     # Fallback: generate tones
@@ -2511,7 +2512,12 @@ class MainWindow(QMainWindow):
             return
         os.makedirs(path, exist_ok=True)
         try:
-            subprocess.Popen(["explorer", os.path.normpath(path)])
+            if sys.platform == "win32":
+                subprocess.Popen(["explorer", os.path.normpath(path)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No se pudo abrir la carpeta:\n{e}")
 

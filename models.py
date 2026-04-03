@@ -8,7 +8,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-DEFAULT_BLENDER = r"F:\Program Files\blender.exe"
+import shutil
+DEFAULT_BLENDER = shutil.which("blender") or (
+    "/Applications/Blender.app/Contents/MacOS/Blender"
+    if sys.platform == "darwin" else
+    r"F:\Program Files\blender.exe"
+)
 
 
 @dataclass
@@ -29,7 +34,7 @@ class BlenderProfile:
 
 
 def default_blender_profiles() -> list[BlenderProfile]:
-    return [BlenderProfile(name="Default", path=DEFAULT_BLENDER)]
+    return [BlenderProfile(name="Default", path=DEFAULT_BLENDER or "")]
 
 # When running as a PyInstaller frozen bundle the install dir may be read-only
 # (e.g. C:\Program Files\…).  Store user data in %APPDATA% instead.
@@ -149,7 +154,7 @@ class RenderJob:
             frame_start=d.get("frame_start", 1),
             frame_end=d.get("frame_end", 250),
             output_path=d.get("output_path", ""),
-            blender_exec=d.get("blender_exec", DEFAULT_BLENDER),
+            blender_exec=d.get("blender_exec", DEFAULT_BLENDER or ""),
             blender_profile=d.get("blender_profile", ""),
             use_nodes=d.get("use_nodes", False),
             samples_override=d.get("samples_override"),
@@ -170,7 +175,7 @@ def resolve_blender_exec(job: RenderJob, profiles: list[BlenderProfile]) -> str:
                 return p.path
     if job.blender_exec:
         return job.blender_exec
-    return DEFAULT_BLENDER
+    return DEFAULT_BLENDER or ""
 
 
 # ---------------------------------------------------------------------------

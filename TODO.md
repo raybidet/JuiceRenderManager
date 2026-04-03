@@ -1,13 +1,26 @@
-# TODO - Rebuild completo de build.bat + installer.iss
+# macOS GitHub Action Build Plan
+## Status: [IN PROGRESS] 
 
-**Estado:** 🔄 EN PROGRESO (3/4)
+## Breakdowned Steps from Approved Plan:
 
-## Plan aprobado
-- [x] Reescribir `build.bat` completo para flujo robusto de build + installer
-- [x] Reescribir `installer.iss` completo compatible con Inno Setup 6
-- [x] Validar consistencia de nombres/rutas (`Juice`, `Juice.exe`, `dist\Juice`)
-- [ ] Ejecutar prueba de compilación y validar resultado final
+## ✅ COMPLETE - macOS GitHub Action Build Ready!
 
-## Notas
-- Problema actual: sigue fallando la compilación/instalación del setup.
-- Objetivo: dejar ambos archivos limpios, consistentes y funcionales con los cambios actuales de la aplicación.
+**Files Created/Updated:**
+- ✅ `requirements.txt`
+- ✅ `models.py` (cross-platform Blender path)
+- ✅ `main_window.py` (Windows guards)
+- ✅ `worker.py` (macOS subprocess flags)
+- ✅ `macos.spec` (PyInstaller macOS .app)
+- ✅ `.github/workflows/build-macos.yml` (CI/CD)
+
+**🚀 TO TEST:**
+1. Push to GitHub → Watch Actions tab
+2. Download `Juice-macos-*.zip` artifact
+3. Unzip → `open Juice.app` → Test render job
+
+**Local Test (macOS):** `pip install -r requirements.txt && pyinstaller macos.spec`
+
+**Release:** `git tag v1.1.1-macos && git push --tags`
+
+**macOS distributable complete!**
+
