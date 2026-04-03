@@ -55,7 +55,7 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-EXE(pyz,
+exe = EXE(pyz,
     a.scripts,
     [],
     exclude_binaries=True,
@@ -68,8 +68,20 @@ EXE(pyz,
     target_arch='universal2',  # Intel + Apple Silicon
 )
 
-# Create macOS .app bundle
-app = BUNDLE(EXE,
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='Juice',
+)
+
+# Create macOS .app bundle (PyInstaller 6 compatible)
+app = BUNDLE(
+    coll,
     name='Juice.app',
     icon='logo.ico',
     bundle_identifier='com.tryhardvfx.juice-rendermanager',
@@ -79,23 +91,5 @@ app = BUNDLE(EXE,
         'NSPrincipalClass': 'NSApplication',
         'LSMinimumSystemVersion': '10.15',  # Catalina+
     },
-    destinations=[
-        MACOSX([
-            ('resources', a.datas),
-            ('binaries', a.binaries),
-            ('zipfiles', a.zipfiles),
-        ])
-    ],
-)
-
-COLLATOR = COLLECT(
-    app,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='Juice',
 )
 
