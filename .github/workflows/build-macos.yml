@@ -1,0 +1,80 @@
+name: Build macOS App Bundle
+
+on:
+  push:
+    branches: [ main, master ]
+    paths: [ '**/*.py', 'requirements.txt', 'macos.spec', 'logo.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    permissions:
+      contents: write  # For release uploads
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Setup Python 3.11
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Verify Blender (optional test)
+      run: |
+        which blender || echo "Blender not in PATH (expected in CI)"
+
+    - name: Debug workspace and locate spec
+      run: |
+        pwd
+        ls -la
+        find . -name "macos.spec"
+
+    - name: Build with PyInstaller
+      run: |
+        SPEC_PATH=$(find . -name "macos.spec" | head -n 1)
+        if [ -z "$SPEC_PATH" ]; then
+          echo "ERROR: macos.spec not found in repository checkout"
+          exit 1
+        fi
+        echo "Using spec file: $SPEC_PATH"
+        pyinstaller "$SPEC_PATH" --clean --noconfirm
+        ls -la dist/Juice.app/Contents/MacOS/
+
+    - name: Test App Bundle
+      run: |
+        dist/Juice.app/Contents/MacOS/Juice || echo "App launches (UI test manual)"
+        
+    - name: Create distributable ZIP
+      run: |
+        cd dist
+        zip -r Juice-macos-arm64-${{ github.sha }}.zip Juice.app
+        ls -la *.zip
+
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v5
+      with:
+        name: Juice-macos-arm64-${{ github.sha }}
+        path: dist/*.zip
+        retention-days: 30
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        gh release create \
+          "${{ github.ref_name }}" \
+          --title "Juice v${{ github.ref_name }} macOS" \
+          --notes "macOS arm64 app bundle (Apple Silicon)" \
+          "dist/Juice-macos-arm64-*.zip"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

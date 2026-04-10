@@ -1,0 +1,4 @@
+- [x] Crear workflow GitHub Actions para build Windows onefile (`.github/workflows/build-windows.yml`)
+- [x] Subir artifact del ejecutable único `dist/Juice.exe`
+- [x] Publicar release en tags (adjuntar `Juice.exe`)
+- [x] Actualizar README con sección de build Windows en GitHub Actions
