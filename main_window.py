@@ -339,7 +339,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Juice | Render Manager for Blender")
         self._set_app_icon()
-        self.resize(1300, 820)
+        self.resize(1500, 820)
         self.setMinimumSize(1000, 660)
         self.setStyleSheet(STYLESHEET)
 
@@ -560,17 +560,9 @@ class MainWindow(QMainWindow):
         scene_row.addStretch()
         form.addLayout(scene_row, 1, 1, 1, 2)
 
-        # Sequence name
-        form.addWidget(QLabel("Sequence Name:"), 2, 0, Qt.AlignmentFlag.AlignRight)
-        seq_row = QHBoxLayout()
-        self.sequence_edit = QLineEdit()
-        self.sequence_edit.setPlaceholderText("e.g. shot_010_lighting  (used as output subfolder)")
-        seq_row.addWidget(self.sequence_edit)
-        form.addLayout(seq_row, 2, 1, 1, 2)
-
         # Frame range + samples
         range_row = QHBoxLayout()
-        range_row.addWidget(QLabel("Frame Start:"))
+        range_row.addWidget(QLabel("Start:"))
         self.frame_start_spin = QSpinBox()
         self.frame_start_spin.setRange(0, 999999)
         self.frame_start_spin.setValue(1)
@@ -603,8 +595,17 @@ class MainWindow(QMainWindow):
         range_row.addWidget(self._resolution_hint)
         
         range_row.addStretch()
-        form.addWidget(QLabel("Frames:"), 3, 0, Qt.AlignmentFlag.AlignRight)
-        form.addLayout(range_row, 3, 1, 1, 2)
+        form.addWidget(QLabel("Frames:"), 2, 0, Qt.AlignmentFlag.AlignRight)
+        form.addLayout(range_row, 2, 1, 1, 2)
+
+        # Use Nodes button
+        self.use_nodes_btn = QPushButton("COMPOSITING NODES: OFF")
+        self.use_nodes_btn.setObjectName("nodes_off")
+        self.use_nodes_btn.setCheckable(True)
+        self.use_nodes_btn.setChecked(False)
+        self.use_nodes_btn.clicked.connect(self._toggle_use_nodes)
+        self.use_nodes_btn.setStyle(self.use_nodes_btn.style())
+        form.addWidget(self.use_nodes_btn, 3, 1)
 
         # Output path + sequence toggle
         form.addWidget(QLabel("Output Path:"), 4, 0, Qt.AlignmentFlag.AlignRight)
@@ -616,14 +617,13 @@ class MainWindow(QMainWindow):
         output_row.addWidget(btn_browse_out)
         form.addLayout(output_row, 4, 1, 1, 2)
 
-        # Use Nodes button
-        self.use_nodes_btn = QPushButton("COMPOSITING NODES: OFF")
-        self.use_nodes_btn.setObjectName("nodes_off")
-        self.use_nodes_btn.setCheckable(True)
-        self.use_nodes_btn.setChecked(False)
-        self.use_nodes_btn.clicked.connect(self._toggle_use_nodes)
-        self.use_nodes_btn.setStyle(self.use_nodes_btn.style())
-        form.addWidget(self.use_nodes_btn, 5, 1)
+         # Sequence name
+        form.addWidget(QLabel("Sequence Name:"), 5, 0, Qt.AlignmentFlag.AlignRight)
+        seq_row = QHBoxLayout()
+        self.sequence_edit = QLineEdit()
+        self.sequence_edit.setPlaceholderText("e.g. shot_010_lighting  (used as output subfolder)")
+        seq_row.addWidget(self.sequence_edit)
+        form.addLayout(seq_row, 5, 1, 1, 2)
 
         # Add / Apply row
         add_apply_row = QHBoxLayout()

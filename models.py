@@ -8,7 +8,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from subprocess import Popen
-from typing import Optional
+from typing import ClassVar, Optional
 
 import shutil
 DEFAULT_BLENDER = shutil.which("blender") or (
@@ -88,13 +88,13 @@ class RenderJob:
     _frame_wall_start: Optional[float] = field(default=None, init=False, repr=False)
     _prev_tracked_frame: Optional[int] = field(default=None, init=False, repr=False)
 
-    # statuses
-    STATUS_PENDING   = "Pending"
-    STATUS_RUNNING   = "Running"
-    STATUS_PAUSED    = "Paused"
-    STATUS_DONE      = "Done"
-    STATUS_ERROR     = "Error"
-    STATUS_CANCELLED = "Cancelled"
+    # statuses (ClassVar so dataclass + type checkers treat them as class constants)
+    STATUS_PENDING: ClassVar[str] = "Pending"
+    STATUS_RUNNING: ClassVar[str] = "Running"
+    STATUS_PAUSED: ClassVar[str] = "Paused"
+    STATUS_DONE: ClassVar[str] = "Done"
+    STATUS_ERROR: ClassVar[str] = "Error"
+    STATUS_CANCELLED: ClassVar[str] = "Cancelled"
 
     _id_counter: int = field(default=0, init=False, repr=False, compare=False)
 
