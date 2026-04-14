@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import sys
 import subprocess
+import tempfile
 import time
 import threading
 import ctypes
@@ -74,7 +75,7 @@ from models import (
     BlenderProfile,
     resolve_blender_exec,
 )
-from worker import RenderWorker, get_blend_info
+from worker import RenderWorker, get_blend_info, build_opengl_script
 from ipc_server import JuiceIPCServer
 from video_presets import VIDEO_PRESETS, PREVIEW_PRESET, preset_names, preset_by_name
 
@@ -299,6 +300,67 @@ class BlendInfoThread(QThread):
     def run(self):
         info = get_blend_info(self.blend_file, self.blender_exec)
         self.finished.emit(info)
+
+
+class ViewportPreviewThread(QThread):
+    """Genera preview de camera viewport con OpenGL render."""
+
+    finished = pyqtSignal(str)  # image_path or error message
+
+    def __init__(self, job: "RenderJob", blender_exec: str):
+        super().__init__()
+        self.job = job
+        self.blender_exec = blender_exec
+        self._tmp_script: str | None = None
+
+    def run(self):
+        import subprocess as sp
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix="_brm.py", delete=False, encoding="utf-8"
+            ) as f:
+                f.write(build_opengl_script(self.job))
+                self._tmp_script = f.name
+
+            img_path = None
+            stderr_lines = []
+            proc = sp.Popen(
+                [
+                    self.blender_exec,
+                    "--background",
+                    self.job.blend_file,
+                    "--python",
+                    self._tmp_script,
+                ],
+                stdout=sp.PIPE,
+                stderr=sp.PIPE,
+                encoding="utf-8",
+                errors="replace",
+            )
+            stdout, stderr = proc.communicate()
+            for line in stdout.splitlines():
+                if line.startswith("PREVIEW_IMAGE:"):
+                    img_path = line.strip().split(":", 1)[1]
+                    break
+            if stderr:
+                stderr_lines = stderr.splitlines()[-10:]
+
+            if img_path and os.path.exists(img_path):
+                self.finished.emit(img_path)
+            elif stderr_lines:
+                err_msg = "; ".join(stderr_lines[-3:])
+                self.finished.emit("[ERROR] " + err_msg)
+            else:
+                self.finished.emit("[ERROR] No preview generated")
+        except Exception as e:
+            self.finished.emit(f"[ERROR] {e}")
+        finally:
+            if self._tmp_script and os.path.exists(self._tmp_script):
+                try:
+                    os.remove(self._tmp_script)
+                except OSError:
+                    pass
 
 
 class ConvertThread(QThread):
@@ -860,6 +922,11 @@ class MainWindow(QMainWindow):
         self._camera_hint = QLabel("(select scene first)")
         self._camera_hint.setStyleSheet(f"color: {C['subtext']}; font-size: 8pt;")
         scene_camera_inner.addWidget(self._camera_hint)
+        self.btn_preview_camera = QPushButton("📷  Preview Camera")
+        self.btn_preview_camera.setToolTip("Preview camera viewport (solid, instant)")
+        self.btn_preview_camera.setEnabled(False)
+        self.btn_preview_camera.clicked.connect(self._preview_camera_viewport)
+        scene_camera_inner.addWidget(self.btn_preview_camera)
         scene_camera_inner.addStretch()
         form.addLayout(scene_camera_inner, 1, 1, 1, 2)
 
@@ -1418,6 +1485,7 @@ class MainWindow(QMainWindow):
             self._camera_hint.setText("(select scene first)")
             self._camera_hint.setStyleSheet(f"color: {C['subtext']}; font-size: 8pt;")
             self.camera_combo.blockSignals(False)
+            self.btn_preview_camera.setEnabled(False)
 
             self.sequence_edit.clear()
             self.output_edit.clear()
@@ -1469,6 +1537,9 @@ class MainWindow(QMainWindow):
         self._apply_blend_info(info, select_scene=select_scene)
 
     def _apply_blend_info(self, info: dict, select_scene: str | None = None):
+        if not info or not info.get("scenes"):
+            return
+
         scenes = info.get("scenes", ["Scene"])
         self._current_samples_map = info.get("samples", {})
         self._current_fps_map = info.get("fps", {})
@@ -1548,6 +1619,27 @@ class MainWindow(QMainWindow):
         self._update_resolution_hint(scene_name)
         self._update_cameras_combo(scene_name)
 
+    def _update_cameras_combo_with_pending(self, scene_name: str, pending_camera: str):
+        cm = getattr(self, "_current_cameras_map", {})
+        cams = cm.get(scene_name, [])
+        self.camera_combo.blockSignals(True)
+        self.camera_combo.clear()
+        if cams:
+            self.camera_combo.addItem("")
+            self.camera_combo.addItems(cams)
+            idx = self.camera_combo.findText(pending_camera)
+            if idx >= 0:
+                self.camera_combo.setCurrentIndex(idx)
+            self.camera_combo.setEnabled(True)
+            self._camera_hint.setText(f"({len(cams)} camera(s))")
+            self._camera_hint.setStyleSheet(f"color: {C['green']}; font-size: 8pt;")
+        else:
+            self.camera_combo.addItem("(not selected)")
+            self.camera_combo.setEnabled(False)
+            self._camera_hint.setText("(no cameras)")
+            self._camera_hint.setStyleSheet(f"color: {C['red']}; font-size: 8pt;")
+        self.camera_combo.blockSignals(False)
+
     def _update_cameras_combo(self, scene_name: str):
         cm = getattr(self, "_current_cameras_map", {})
         cams = cm.get(scene_name, [])
@@ -1565,6 +1657,9 @@ class MainWindow(QMainWindow):
             self._camera_hint.setText("(no cameras)")
             self._camera_hint.setStyleSheet(f"color: {C['red']}; font-size: 8pt;")
         self.camera_combo.blockSignals(False)
+        self.btn_preview_camera.setEnabled(
+            bool(cams) and bool(self.blend_edit.text().strip())
+        )
 
     def _update_samples_hint(self, scene_name: str):
         sm = getattr(self, "_current_samples_map", {})
@@ -1611,6 +1706,12 @@ class MainWindow(QMainWindow):
         """Fill the add-job form from a queued job (selection changed)."""
         self._loading_job_into_form = True
         self._pending_camera_to_select = job.camera
+
+        old_cameras = getattr(self, "_current_cameras_map", {})
+        old_samples = getattr(self, "_current_samples_map", {})
+        old_fps = getattr(self, "_current_fps_map", {})
+        old_resolution = getattr(self, "_current_resolution_map", {})
+
         try:
             self.blend_edit.setText(job.blend_file)
             self._sync_blender_ui_from_job(job)
@@ -1628,7 +1729,26 @@ class MainWindow(QMainWindow):
                 self.resolution_edit.clear()
             self.use_nodes_btn.setChecked(job.use_nodes)
             self._toggle_use_nodes()
-            self._load_blend_info_for_job_edit(job)
+
+            bexec = resolve_blender_exec(job, self._blender_profiles)
+            key = f"{job.blend_file}\n{bexec}"
+
+            if key in self._blend_info_cache:
+                cached = self._blend_info_cache[key]
+                if (
+                    cached.get("scenes")
+                    and sum(len(c) for c in cached.get("cameras", {}).values()) > 0
+                ):
+                    self._apply_blend_info(cached, select_scene=job.scene)
+                else:
+                    self._current_cameras_map = old_cameras
+                    self._current_samples_map = old_samples
+                    self._current_fps_map = old_fps
+                    self._current_resolution_map = old_resolution
+                    if job.camera:
+                        self._update_cameras_combo_with_pending(job.scene, job.camera)
+            else:
+                self._load_blend_info_for_job_edit(job)
         finally:
             self._loading_job_into_form = False
             self._set_form_dirty(False)
@@ -1727,6 +1847,8 @@ class MainWindow(QMainWindow):
             self._add_job_from_ipc_payload(payload)
 
     def _validate_ipc_payload(self, payload: dict) -> tuple[dict | None, str | None]:
+        if not isinstance(payload, dict):
+            return None, "payload must be a JSON object."
         blend = str(payload.get("blend_file", "")).strip()
         scene = str(payload.get("scene", "Scene")).strip() or "Scene"
 
@@ -2561,6 +2683,9 @@ class MainWindow(QMainWindow):
             return
         self._selected_job_id = job_id
         self._btn_apply_to_job.setEnabled(job.status != RenderJob.STATUS_RUNNING)
+        self.btn_preview_camera.setEnabled(
+            job.status != RenderJob.STATUS_RUNNING and bool(job.camera)
+        )
 
         self.log_edit.clear()
         for line in job.log_lines:
@@ -2639,7 +2764,6 @@ class MainWindow(QMainWindow):
         try:
             pixmap = QPixmap(img_path)
             if pixmap.isNull():
-                # Try via Pillow for EXR etc.
                 from PIL import Image
                 import io
 
@@ -2657,6 +2781,64 @@ class MainWindow(QMainWindow):
             self.preview_label.setPixmap(scaled)
         except Exception as e:
             self.preview_label.setText(f"Preview error: {e}")
+
+    def _preview_camera_viewport(self):
+        blend = self.blend_edit.text().strip()
+        scene = self.scene_combo.currentText().strip()
+        camera = self.camera_combo.currentText().strip()
+
+        if not blend or not scene:
+            QMessageBox.warning(
+                self, "Warning", "Please select a .blend file and scene first."
+            )
+            return
+        if not camera:
+            QMessageBox.warning(
+                self, "Warning", "Please select a specific camera (not scene default)."
+            )
+            return
+
+        output = self.output_edit.text().strip() or os.path.dirname(blend)
+        self.preview_label.setText("Generating camera preview...")
+        self.btn_preview_camera.setEnabled(False)
+
+        job = RenderJob(
+            blend_file=blend,
+            scene=scene,
+            camera=camera,
+            frame_start=self.frame_start_spin.value(),
+            frame_end=self.frame_start_spin.value(),
+            output_path=output,
+        )
+
+        self._preview_thread = ViewportPreviewThread(job, self.blender_exec)
+        self._preview_thread.finished.connect(self._on_preview_camera_done)
+        self._preview_thread.finished.connect(self._preview_thread.deleteLater)
+        self.status_bar.showMessage("Rendering viewport preview...")
+        self._preview_thread.start()
+
+    def _on_preview_camera_done(self, img_path: str):
+        self.btn_preview_camera.setEnabled(True)
+        if img_path.startswith("[ERROR]"):
+            self.preview_label.setText(img_path)
+            return
+        try:
+            pixmap = QPixmap(img_path)
+            scaled = pixmap.scaled(
+                380,
+                200,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.preview_label.setPixmap(scaled)
+        except Exception as e:
+            self.preview_label.setText(f"Preview error: {e}")
+        finally:
+            if os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                except OSError:
+                    pass
 
     def _refresh_preview(self):
         job = self._selected_job()
@@ -2861,8 +3043,6 @@ class MainWindow(QMainWindow):
         for widget in widgets_to_track:
             widget.installEventFilter(self)
         self.queue_tree.installEventFilter(self)
-
-        print("[BRM] Keyboard shortcuts tracking installed")
 
     def _update_focus_context(self, widget) -> None:
         """Update job_list_has_focus based on current widget focus."""

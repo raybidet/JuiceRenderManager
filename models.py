@@ -110,12 +110,28 @@ class RenderJob:
         if not self.blender_exec:
             self.blender_exec = DEFAULT_BLENDER
 
+    @staticmethod
+    def _sanitize_path_component(component: str) -> str:
+        """Remove path traversal attempts from a path component."""
+        if not component:
+            return ""
+        component = component.replace("\\", "/")
+        component = component.replace("", "")
+        while ".." in component:
+            component = component.replace("..", "_")
+        component = "".join(c for c in component if c not in "/\\")
+        return component.strip()
+
     @property
     def effective_output_path(self) -> str:
-        """Resolved output directory: base_path/sequence_name (if name given)."""
+        """Resolved output directory: base_path/sequence_name (if name given), with traversal sanitized."""
+        base = self.output_path or ""
+        base = os.path.normpath(base) if base else ""
         if self.sequence_name:
-            return os.path.join(self.output_path, self.sequence_name)
-        return self.output_path
+            safe_seq = RenderJob._sanitize_path_component(self.sequence_name)
+            if safe_seq:
+                return os.path.join(base, safe_seq)
+        return base
 
     @property
     def total_frames(self) -> int:
@@ -185,15 +201,34 @@ class RenderJob:
         return job
 
 
+def _sanitize_exec_path(path: str) -> str:
+    """Sanitize executable path to prevent command injection."""
+    if not path:
+        return path
+    dangerous_chars = ";&|<>$`\\"
+    for c in dangerous_chars:
+        if c in path:
+            idx = path.find(c)
+            safe = path[:idx].strip()
+            if safe:
+                return safe
+            return ""
+    return path.strip()
+
+
 def resolve_blender_exec(job: RenderJob, profiles: list[BlenderProfile]) -> str:
     """Executable path for a job: named profile wins, else stored path."""
+    path = ""
     if job.blender_profile:
         for p in profiles:
             if p.name == job.blender_profile:
-                return p.path
-    if job.blender_exec:
-        return job.blender_exec
-    return DEFAULT_BLENDER or ""
+                path = p.path
+                break
+    if not path and job.blender_exec:
+        path = job.blender_exec
+    if not path:
+        path = DEFAULT_BLENDER or ""
+    return _sanitize_exec_path(path)
 
 
 # ---------------------------------------------------------------------------
